@@ -165,12 +165,12 @@ module Puppet::Util::Firewall
 
     # Fedora 15 and newer use systemd to persist iptable rules
     if os_key == 'RedHat' && Facter.value(:operatingsystem) == 'Fedora' && Facter.value(:operatingsystemrelease).to_i >= 15
-      os_key = 'Fedora'
+      os_key = 'RedHat_systemd'
     end
 
     # RHEL 7 and newer also use systemd to persist iptable rules
     if os_key == 'RedHat' && ['RedHat','CentOS','Scientific','SL','SLC','Ascendos','CloudLinux','PSBM','OracleLinux','OVS','OEL','XenServer'].include?(Facter.value(:operatingsystem)) && Facter.value(:operatingsystemrelease).to_i >= 7
-      os_key = 'Fedora'
+      os_key = 'RedHat_systemd'
     end
 
     cmd = case os_key.to_sym
@@ -181,12 +181,12 @@ module Puppet::Util::Firewall
       when :IPv6
         %w{/sbin/service ip6tables save}
       end
-    when :Fedora
+    when :RedHat_systemd
       case proto.to_sym
       when :IPv4
-        %w{/usr/libexec/iptables/iptables.init save}
+        check_iptables_file_exists(:IPv4)
       when :IPv6
-        %w{/usr/libexec/iptables/ip6tables.init save}
+        check_iptables_file_exists(:IPv6)
       end
     when :Debian
       case proto.to_sym
@@ -221,6 +221,21 @@ module Puppet::Util::Firewall
       execute(cmd)
     rescue Puppet::ExecutionFailure => detail
       warning("Unable to persist firewall rules: #{detail}")
+    end
+  end
+
+  def check_iptables_file_exists(proto)
+    case proto
+    when :IPv4
+      iptables_cmd = '/usr/libexec/iptables/iptables.init'
+    when :IPv6 
+      iptables_cmd = '/usr/libexec/iptables/ip6tables.init'
+    end
+    if Puppet::FileSystem::exist?(iptables_cmd)
+      [iptables_cmd, 'save']
+    else
+      warning("Could not find #{iptables_cmd}, trying firewalld command")
+      ['/bin/firewall-cmd', '--reload']
     end
   end
 end
