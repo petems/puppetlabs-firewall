@@ -1,5 +1,20 @@
 require 'beaker-rspec'
 
+def is_rhel7(osfamily, operatingsystem, operatingsystemrelease)
+  if osfamily == 'RedHat'
+    case operatingsystem
+    when 'Amazon'
+      false
+    when 'Fedora'
+      operatingsystemrelease >= '7.0'
+    else
+      operatingsystemrelease >= '15'
+    end
+  else
+    false
+  end
+end
+
 def iptables_flush_all_tables
   ['filter', 'nat', 'mangle', 'raw'].each do |t|
     expect(shell("iptables -t #{t} -F").stderr).to eq("")
